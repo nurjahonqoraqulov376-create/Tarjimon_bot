@@ -100,9 +100,21 @@ Service → **Settings → Volumes → New Volume** → Mount path: `/data`
 ### 4. Muhim sozlamalar
 
 - **Replicas = 1.** Ikkita nusxa bir vaqtda `getUpdates` chaqirsa, Telegram
-  `409 Conflict` qaytaradi va bot ishlamay qoladi. `railway.json` da
-  `numReplicas: 1` qilib qo'yilgan — uni oshirmang.
+  `409 Conflict` qaytaradi. Bot bundan o'zi tiklanadi (~11 soniyada qayta
+  ulanadi), lekin ikkita nusxa doim urishib turadi — shuning uchun 1 ta
+  bo'lishi shart.
+- **Sleep o'chirilgan bo'lsin.** Xizmat uxlasa polling to'xtaydi.
 - **Healthcheck yoqilmasin.** Bu worker, HTTP porti yo'q.
+
+> ⚠️ **`railway.json` eskirmoqda.** Railway Config-as-Code'ni
+> **2026-12-01** da o'chiradi. Shuning uchun muhim sozlamalar Railway'ning
+> **service sozlamalarida** ham o'rnatilgan (`numReplicas = 1`,
+> `dockerfilePath = Dockerfile`, `sleepApplication = false`). Shu sababli
+> `railway.json` yo'qolsa ham build to'g'ri ketadi — busiz Railway RAILPACK'ka
+> tushib qolardi va Dockerfile'dagi ffmpeg hamda whisper modeli yo'qolardi.
+>
+> Railway'da Dockerfile `builder` enum qiymati emas (u faqat HEROKU / NIXPACKS
+> / PAKETO / RAILPACK), Dockerfile'ni **`dockerfilePath`** belgilaydi.
 
 ---
 
@@ -120,16 +132,17 @@ Shuning uchun bot maxsus qilib shunday yozilgan:
 - Model Docker image ichida tayyor turadi, shuning uchun qayta yuklash
   ~1.5 soniya oladi
 
-O'lchangan natijalar:
+**Railway'da o'lchangan haqiqiy natijalar** (bo'sh turgan bot, production):
 
-| Holat | RAM | Taxminiy oylik |
+| Resurs | O'lchov | Oylik |
 |---|---|---|
-| Bo'sh turganda (odatiy holat) | ~150 MB | **~$1.5 + CPU** |
-| Ovoz qayta ishlanayotganda | ~400 MB | qisqa muddat |
-| Agar model doim yuklangan qolsa | ~400 MB | ~$4 + CPU |
+| RAM | o'rtacha **65 MB**, eng yuqori 173 MB | ~$0.64 |
+| CPU | o'rtacha **0.003 vCPU** | ~$0.06 |
+| **Jami** | | **~$0.70/oy** |
 
-Odatiy foydalanishda oylik xarajat **$2–3** atrofida chiqadi va $5 kredit ichida
-qoladi.
+Ya'ni $5 kredit ichida ovoz tarjimasi uchun juda katta zaxira qoladi.
+(Ovoz qayta ishlanayotganda RAM qisqa muddatga ~400 MB gacha ko'tariladi,
+keyin `WHISPER_IDLE_UNLOAD_SEC` dan so'ng yana tushadi.)
 
 **Sifatni oshirmoqchi bo'lsangiz:** `WHISPER_MODEL=small` qo'ying — o'zbek tilini
 ancha yaxshi tushunadi, lekin RAM ~950 MB gacha ko'tariladi va faol botda oylik
