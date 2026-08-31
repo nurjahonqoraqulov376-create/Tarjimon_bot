@@ -39,7 +39,12 @@ def render(result: TranslationResult, ui_lang: str) -> str:
         # quote=False muhim: Telegram HTML'da faqat &amp; &lt; &gt; ni biladi,
         # apostrofni &#x27; ga aylantirsak o'zbekcha "so'rang" buzilib ketadi.
         blocks.append(f"{header}\n{html.escape(text, quote=False)}")
-    return "\n\n".join(blocks)
+
+    body = "\n\n".join(blocks)
+    if result.failed:
+        # Tilni jimgina tashlab ketmaymiz — foydalanuvchi nima kamligini bilsin.
+        body += t("partial_fail", ui_lang)
+    return body
 
 
 async def deliver(message: Message, status: Message | None, body: str) -> None:

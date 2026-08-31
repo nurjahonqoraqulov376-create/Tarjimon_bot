@@ -40,6 +40,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "empty_voice": "🤔 Ovozdan matn chiqmadi. Balandroq va aniqroq gapirib ko'ring.",
         "error": "❌ Xatolik yuz berdi. Birozdan keyin qayta urinib ko'ring.",
         "throttled": "⏱ Birozdan keyin urinib ko'ring.",
+        "partial_fail": (
+            "\n\n⚠️ <i>Ba'zi tillarga tarjima qilinmadi, "
+            "birozdan keyin urinib ko'ring.</i>"
+        ),
         "unsupported": (
             "🤔 Men faqat <b>matn</b> va <b>ovozli xabar</b>ni tarjima qila olaman."
         ),
@@ -91,6 +95,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "empty_voice": "🤔 Не удалось распознать речь. Попробуйте говорить чётче.",
         "error": "❌ Произошла ошибка. Попробуйте чуть позже.",
         "throttled": "⏱ Слишком часто, подождите немного.",
+        "partial_fail": (
+            "\n\n⚠️ <i>Не удалось перевести на некоторые языки, "
+            "попробуйте позже.</i>"
+        ),
         "unsupported": (
             "🤔 Я умею переводить только <b>текст</b> и <b>голосовые сообщения</b>."
         ),
@@ -140,6 +148,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "empty_voice": "🤔 I couldn't make out any speech. Try speaking more clearly.",
         "error": "❌ Something went wrong. Please try again in a moment.",
         "throttled": "⏱ Too fast — please wait a moment.",
+        "partial_fail": (
+            "\n\n⚠️ <i>Some languages could not be translated, "
+            "please try again later.</i>"
+        ),
         "unsupported": "🤔 I can only translate <b>text</b> and <b>voice messages</b>.",
         "not_admin": "This command is for the admin only.",
         "stats": (
