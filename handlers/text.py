@@ -1,4 +1,4 @@
-"""Matnli xabarni uchala tilga tarjima qilish."""
+"""Matnli xabarni qo'llab-quvvatlanadigan barcha tillarga tarjima qilish."""
 
 from __future__ import annotations
 

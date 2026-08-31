@@ -30,8 +30,8 @@ _run_sem = asyncio.Semaphore(1)
 _last_used = 0.0
 _config: Config | None = None
 
-# uz/ru/en ehtimoli shundan past bo'lsa — bu tanish nutq emas deb hisoblaymiz.
-# Haqiqiy nutqda ehtimol odatda 0.8+ chiqadi, shovqinda esa 0.1 atrofida.
+# Qo'llab-quvvatlanadigan tillar ehtimoli shundan past bo'lsa — bu tanish
+# nutq emas. Haqiqiy nutqda ehtimol odatda 0.8+, shovqinda esa 0.1 atrofida.
 MIN_LANG_PROB = 0.25
 
 
@@ -77,8 +77,8 @@ def _transcribe_blocking(model, path: str) -> tuple[str, str | None]:
     audio = decode_audio(path, sampling_rate=16000)
 
     # Whisper 99 ta tilni biladi va shovqinli ovozda mutlaqo boshqa tilni
-    # tanlab, ma'nosiz matn qaytarishi mumkin. Biz faqat uz/ru/en bilan
-    # ishlaymiz — shuning uchun tilni o'zimiz shu uchtasi ichidan tanlab,
+    # tanlab, ma'nosiz matn qaytarishi mumkin. Biz faqat `LANGS` bilan
+    # ishlaymiz — shuning uchun tilni o'zimiz shu ro'yxat ichidan tanlab,
     # transcribe'ga majburan uzatamiz.
     language: str | None = None
     try:
@@ -94,7 +94,7 @@ def _transcribe_blocking(model, path: str) -> tuple[str, str | None]:
                 ", ".join(f"{c}={probs[c]:.2f}" for c in LANGS if c in probs),
             )
             if probs[language] < MIN_LANG_PROB:
-                # Uchala tilning ham ehtimoli juda past — bu tanish nutq emas
+                # Barcha tillarning ehtimoli juda past — bu tanish nutq emas
                 # (shovqin, musiqa yoki boshqa til). Majburan tarjima qilsak,
                 # ma'nosiz "fonetik" matn chiqadi, shuning uchun rad etamiz.
                 log.info("Nutq tanilmadi (eng yuqori ehtimol %.2f)", probs[language])

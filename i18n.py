@@ -1,4 +1,4 @@
-"""Bot interfeysi matnlari: o'zbek, rus, ingliz."""
+"""Bot interfeysi matnlari: o'zbek, rus, ingliz, arab, fransuz, nemis."""
 
 from __future__ import annotations
 
@@ -10,16 +10,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "lang_saved": "✅ Til o'zbekchaga o'zgartirildi.",
         "start": (
             "👋 Salom, <b>{name}</b>!\n\n"
-            "Men <b>3 tilli tarjimonman</b>. Menga <b>istalgan tilda</b> "
-            "(o'zbek, rus yoki ingliz) matn yozing — men uni "
-            "<b>uchala tilda</b> qaytaraman.\n\n"
+            "Men <b>6 tilli tarjimonman</b>. Menga <b>istalgan tilda</b> "
+            "(o'zbek, rus, ingliz, arab, fransuz yoki nemis) matn yozing — "
+            "men uni <b>oltala tilda</b> qaytaraman.\n\n"
             "🎤 Ovozli xabar ham yuborishingiz mumkin — avval matnga "
             "o'giraman, keyin tarjima qilaman.\n\n"
             "Boshlash uchun shunchaki biror narsa yozing 👇"
         ),
         "help": (
             "<b>Qanday ishlataman?</b>\n\n"
-            "• Matn yozing — javobda 🇺🇿 🇷🇺 🇬🇧 uchala tarjima chiqadi\n"
+            "• Matn yozing — javobda 🇺🇿 🇷🇺 🇬🇧 🇸🇦 🇫🇷 🇩🇪 tarjimalar chiqadi\n"
             "• 🎤 Ovozli xabar yuboring (maksimal {max_sec} soniya)\n"
             "• Manba tilni ko'rsatish shart emas — o'zim aniqlayman\n\n"
             "<b>Buyruqlar</b>\n"
@@ -65,16 +65,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "lang_saved": "✅ Язык изменён на русский.",
         "start": (
             "👋 Привет, <b>{name}</b>!\n\n"
-            "Я <b>переводчик на 3 языка</b>. Напишите мне текст на "
-            "<b>любом языке</b> (узбекский, русский или английский) — "
-            "я верну перевод <b>на всех трёх</b>.\n\n"
+            "Я <b>переводчик на 6 языков</b>. Напишите мне текст на "
+            "<b>любом языке</b> (узбекский, русский, английский, арабский, "
+            "французский или немецкий) — я верну перевод <b>на всех шести</b>.\n\n"
             "🎤 Можно отправить и голосовое сообщение — сначала распознаю "
             "речь, потом переведу.\n\n"
             "Просто напишите что-нибудь 👇"
         ),
         "help": (
             "<b>Как пользоваться?</b>\n\n"
-            "• Отправьте текст — в ответ придут переводы 🇺🇿 🇷🇺 🇬🇧\n"
+            "• Отправьте текст — в ответ придут переводы 🇺🇿 🇷🇺 🇬🇧 🇸🇦 🇫🇷 🇩🇪\n"
             "• 🎤 Отправьте голосовое (максимум {max_sec} секунд)\n"
             "• Указывать исходный язык не нужно — определю сам\n\n"
             "<b>Команды</b>\n"
@@ -120,16 +120,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "lang_saved": "✅ Language switched to English.",
         "start": (
             "👋 Hi, <b>{name}</b>!\n\n"
-            "I'm a <b>3-language translator</b>. Send me text in <b>any "
-            "language</b> (Uzbek, Russian or English) and I'll reply with "
-            "the translation <b>in all three</b>.\n\n"
+            "I'm a <b>6-language translator</b>. Send me text in <b>any "
+            "language</b> (Uzbek, Russian, English, Arabic, French or German) "
+            "and I'll reply with the translation <b>in all six</b>.\n\n"
             "🎤 You can also send a voice message — I'll transcribe it "
             "first, then translate.\n\n"
             "Just type something to start 👇"
         ),
         "help": (
             "<b>How to use</b>\n\n"
-            "• Send text — you'll get 🇺🇿 🇷🇺 🇬🇧 translations back\n"
+            "• Send text — you'll get 🇺🇿 🇷🇺 🇬🇧 🇸🇦 🇫🇷 🇩🇪 translations back\n"
             "• 🎤 Send a voice message (up to {max_sec} seconds)\n"
             "• No need to pick a source language — I detect it\n\n"
             "<b>Commands</b>\n"
@@ -166,6 +166,172 @@ TEXTS: dict[str, dict[str, str]] = {
         "whisper_loaded": "loaded ({model})",
         "whisper_unloaded": "not loaded",
     },
+    "ar": {
+        "choose_lang": "اختر لغة الواجهة:",
+        "lang_saved": "✅ تم تغيير اللغة إلى العربية.",
+        "start": (
+            "👋 مرحبًا، <b>{name}</b>!\n\n"
+            "أنا <b>مترجم بست لغات</b>. أرسل لي نصًا <b>بأي لغة</b> "
+            "(الأوزبكية، الروسية، الإنجليزية، العربية، الفرنسية أو الألمانية) "
+            "وسأعيد لك الترجمة <b>باللغات الست</b>.\n\n"
+            "🎤 يمكنك أيضًا إرسال رسالة صوتية — سأحوّلها إلى نص أولًا ثم أترجمها.\n\n"
+            "اكتب أي شيء للبدء 👇"
+        ),
+        "help": (
+            "<b>كيفية الاستخدام</b>\n\n"
+            "• أرسل نصًا — ستصلك ترجمات 🇺🇿 🇷🇺 🇬🇧 🇸🇦 🇫🇷 🇩🇪\n"
+            "• 🎤 أرسل رسالة صوتية (حتى {max_sec} ثانية)\n"
+            "• لا حاجة لتحديد لغة المصدر — سأكتشفها بنفسي\n\n"
+            "<b>الأوامر</b>\n"
+            "/start — إعادة تشغيل البوت\n"
+            "/til — تغيير لغة الواجهة\n"
+            "/help — هذه المساعدة"
+        ),
+        "translating": "⏳ جارٍ الترجمة...",
+        "listening": "🎧 جارٍ تحويل الصوت إلى نص...",
+        "source_label": "النص الأصلي",
+        "too_long_voice": (
+            "⚠️ الرسالة الصوتية طويلة جدًا ({sec} ثانية). "
+            "الحد الأقصى هو {max_sec} ثانية."
+        ),
+        "too_long_text": "⚠️ النص طويل جدًا. الحد الأقصى {max_chars} حرفًا.",
+        "empty_voice": "🤔 لم أتمكن من تمييز أي كلام. حاول التحدث بوضوح أكبر.",
+        "error": "❌ حدث خطأ ما. حاول مرة أخرى بعد قليل.",
+        "throttled": "⏱ بسرعة كبيرة — انتظر قليلًا من فضلك.",
+        "partial_fail": (
+            "\n\n⚠️ <i>تعذّرت الترجمة إلى بعض اللغات، حاول مرة أخرى لاحقًا.</i>"
+        ),
+        "unsupported": "🤔 أستطيع ترجمة <b>النصوص</b> و<b>الرسائل الصوتية</b> فقط.",
+        "not_admin": "هذا الأمر متاح للمشرف فقط.",
+        "stats": (
+            "<b>📊 الإحصائيات</b>\n\n"
+            "👥 المستخدمون: <b>{users}</b>\n"
+            "🔥 نشطون خلال 24 ساعة: <b>{active_24h}</b>\n"
+            "✍️ ترجمات نصية: <b>{texts}</b>\n"
+            "🎤 ترجمات صوتية: <b>{voices}</b>\n\n"
+            "🧠 الذاكرة (RSS): <b>{rss_mb} MB</b>\n"
+            "🗣 نموذج Whisper: <b>{whisper}</b>"
+        ),
+        "whisper_loaded": "محمّل ({model})",
+        "whisper_unloaded": "غير محمّل",
+    },
+    "fr": {
+        "choose_lang": "Choisissez la langue de l'interface :",
+        "lang_saved": "✅ Langue changée en français.",
+        "start": (
+            "👋 Bonjour, <b>{name}</b> !\n\n"
+            "Je suis un <b>traducteur en 6 langues</b>. Écrivez-moi un texte "
+            "dans <b>n'importe quelle langue</b> (ouzbek, russe, anglais, arabe, "
+            "français ou allemand) — je vous renverrai la traduction "
+            "<b>dans les six</b>.\n\n"
+            "🎤 Vous pouvez aussi envoyer un message vocal — je le transcris "
+            "d'abord, puis je traduis.\n\n"
+            "Écrivez quelque chose pour commencer 👇"
+        ),
+        "help": (
+            "<b>Comment m'utiliser ?</b>\n\n"
+            "• Envoyez un texte — vous recevrez les traductions 🇺🇿 🇷🇺 🇬🇧 🇸🇦 🇫🇷 🇩🇪\n"
+            "• 🎤 Envoyez un message vocal (jusqu'à {max_sec} secondes)\n"
+            "• Inutile d'indiquer la langue source — je la détecte moi-même\n\n"
+            "<b>Commandes</b>\n"
+            "/start — redémarrer le bot\n"
+            "/til — changer la langue de l'interface\n"
+            "/help — cette aide"
+        ),
+        "translating": "⏳ Traduction en cours...",
+        "listening": "🎧 Transcription du message vocal...",
+        "source_label": "texte original",
+        "too_long_voice": (
+            "⚠️ Ce message vocal est trop long ({sec} s). "
+            "La limite est de {max_sec} secondes."
+        ),
+        "too_long_text": (
+            "⚠️ Ce texte est trop long. La limite est de {max_chars} caractères."
+        ),
+        "empty_voice": (
+            "🤔 Je n'ai rien pu distinguer. Essayez de parler plus clairement."
+        ),
+        "error": "❌ Une erreur s'est produite. Réessayez dans un instant.",
+        "throttled": "⏱ Trop rapide — patientez un instant.",
+        "partial_fail": (
+            "\n\n⚠️ <i>Certaines langues n'ont pas pu être traduites, "
+            "réessayez plus tard.</i>"
+        ),
+        "unsupported": (
+            "🤔 Je ne peux traduire que du <b>texte</b> et des "
+            "<b>messages vocaux</b>."
+        ),
+        "not_admin": "Cette commande est réservée à l'administrateur.",
+        "stats": (
+            "<b>📊 Statistiques</b>\n\n"
+            "👥 Utilisateurs : <b>{users}</b>\n"
+            "🔥 Actifs sur 24 h : <b>{active_24h}</b>\n"
+            "✍️ Traductions de texte : <b>{texts}</b>\n"
+            "🎤 Traductions vocales : <b>{voices}</b>\n\n"
+            "🧠 Mémoire (RSS) : <b>{rss_mb} MB</b>\n"
+            "🗣 Modèle Whisper : <b>{whisper}</b>"
+        ),
+        "whisper_loaded": "chargé ({model})",
+        "whisper_unloaded": "non chargé",
+    },
+    "de": {
+        "choose_lang": "Wähle die Sprache der Oberfläche:",
+        "lang_saved": "✅ Sprache auf Deutsch umgestellt.",
+        "start": (
+            "👋 Hallo, <b>{name}</b>!\n\n"
+            "Ich bin ein <b>Übersetzer für 6 Sprachen</b>. Schreib mir einen "
+            "Text in <b>einer beliebigen Sprache</b> (Usbekisch, Russisch, "
+            "Englisch, Arabisch, Französisch oder Deutsch) — ich antworte mit "
+            "der Übersetzung <b>in allen sechs</b>.\n\n"
+            "🎤 Du kannst auch eine Sprachnachricht senden — ich schreibe sie "
+            "zuerst ab und übersetze sie dann.\n\n"
+            "Schreib einfach etwas, um zu starten 👇"
+        ),
+        "help": (
+            "<b>So funktioniert es</b>\n\n"
+            "• Sende einen Text — du bekommst 🇺🇿 🇷🇺 🇬🇧 🇸🇦 🇫🇷 🇩🇪 Übersetzungen\n"
+            "• 🎤 Sende eine Sprachnachricht (bis zu {max_sec} Sekunden)\n"
+            "• Die Ausgangssprache musst du nicht angeben — ich erkenne sie\n\n"
+            "<b>Befehle</b>\n"
+            "/start — Bot neu starten\n"
+            "/til — Sprache der Oberfläche ändern\n"
+            "/help — diese Hilfe"
+        ),
+        "translating": "⏳ Übersetze...",
+        "listening": "🎧 Sprachnachricht wird transkribiert...",
+        "source_label": "Originaltext",
+        "too_long_voice": (
+            "⚠️ Diese Sprachnachricht ist zu lang ({sec} s). "
+            "Das Limit liegt bei {max_sec} Sekunden."
+        ),
+        "too_long_text": (
+            "⚠️ Dieser Text ist zu lang. Das Limit liegt bei {max_chars} Zeichen."
+        ),
+        "empty_voice": (
+            "🤔 Ich konnte nichts verstehen. Sprich bitte etwas deutlicher."
+        ),
+        "error": "❌ Etwas ist schiefgelaufen. Versuche es gleich noch einmal.",
+        "throttled": "⏱ Zu schnell — warte bitte einen Moment.",
+        "partial_fail": (
+            "\n\n⚠️ <i>Einige Sprachen konnten nicht übersetzt werden, "
+            "versuche es später noch einmal.</i>"
+        ),
+        "unsupported": (
+            "🤔 Ich kann nur <b>Text</b> und <b>Sprachnachrichten</b> übersetzen."
+        ),
+        "not_admin": "Dieser Befehl ist nur für den Administrator.",
+        "stats": (
+            "<b>📊 Statistik</b>\n\n"
+            "👥 Nutzer: <b>{users}</b>\n"
+            "🔥 Aktiv in 24 h: <b>{active_24h}</b>\n"
+            "✍️ Textübersetzungen: <b>{texts}</b>\n"
+            "🎤 Sprachübersetzungen: <b>{voices}</b>\n\n"
+            "🧠 Speicher (RSS): <b>{rss_mb} MB</b>\n"
+            "🗣 Whisper-Modell: <b>{whisper}</b>"
+        ),
+        "whisper_loaded": "geladen ({model})",
+        "whisper_unloaded": "nicht geladen",
+    },
 }
 
 # Telegram buyruqlar menyusi (BotFather'dagi ro'yxat).
@@ -185,6 +351,21 @@ COMMAND_DESCRIPTIONS = {
         "til": "Change interface language",
         "help": "Help",
     },
+    "ar": {
+        "start": "تشغيل البوت",
+        "til": "تغيير لغة الواجهة",
+        "help": "مساعدة",
+    },
+    "fr": {
+        "start": "Démarrer le bot",
+        "til": "Changer la langue de l'interface",
+        "help": "Aide",
+    },
+    "de": {
+        "start": "Bot starten",
+        "til": "Sprache der Oberfläche ändern",
+        "help": "Hilfe",
+    },
 }
 
 
@@ -196,7 +377,7 @@ def t(key: str, lang: str, **kwargs) -> str:
 
 
 def normalize_lang(code: str | None) -> str:
-    """Telegram'ning `language_code` qiymatini uz/ru/en ga keltiradi."""
+    """Telegram'ning `language_code` qiymatini `LANGS` dagi tilga keltiradi."""
     if not code:
         return "uz"
     base = code.split("-")[0].lower()

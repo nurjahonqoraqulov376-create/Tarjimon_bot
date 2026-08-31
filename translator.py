@@ -1,4 +1,4 @@
-"""Matnni uchala tilga (uz/ru/en) tarjima qilish va manba tilini aniqlash.
+"""Matnni oltala tilga (uz/ru/en/ar/fr/de) tarjima qilish va manba tilini aniqlash.
 
 Ishonchlilik uchun ikkita mustaqil provayder ishlatiladi:
 
@@ -47,7 +47,21 @@ _HEADERS = {
 }
 
 _ATTEMPTS = 3
+# Bitta xabar 6 tilga tarjima qilinadi. Oltalasini birdan yuborsak Google'ning
+# bepul endpoint'i "unusual traffic" deb bloklab qo'yishi mumkin, shuning uchun
+# bir vaqtda nechta so'rov ketishini cheklaymiz.
+_MAX_PARALLEL = 3
 _client: httpx.AsyncClient | None = None
+_gate: asyncio.Semaphore | None = None
+
+
+def _get_gate() -> asyncio.Semaphore:
+    # Semaphore hozirgi event loop'ga bog'lanadi — modul import bo'lganda emas,
+    # birinchi ishlatilganda yaratamiz.
+    global _gate
+    if _gate is None:
+        _gate = asyncio.Semaphore(_MAX_PARALLEL)
+    return _gate
 
 
 class TranslationError(RuntimeError):
@@ -95,7 +109,11 @@ def _validate(translated: str, provider: str, target: str) -> str:
 # --------------------------------------------------------------------------
 
 _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
-_LATIN_RE = re.compile(r"[A-Za-z]")
+_LATIN_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]")
+# Arab yozuvi: asosiy blok + qo'shimchalar va taqdimot shakllari.
+_ARABIC_RE = re.compile(
+    "[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]"
+)
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 # Faqat o'zbek kirillida uchraydigan harflar (rus alifbosida yo'q).
@@ -133,20 +151,52 @@ _RU_WORDS = {
     "дела", "сейчас", "завтра", "сегодня", "вчера", "меня", "тебя", "нас",
 }
 
+_FR_WORDS = {
+    "le", "la", "les", "un", "une", "des", "du", "au", "aux", "et", "est",
+    "sont", "je", "tu", "il", "elle", "nous", "vous", "ils", "elles", "que",
+    "qui", "quoi", "pour", "avec", "dans", "sur", "pas", "ne", "plus", "mais",
+    "comme", "comment", "pourquoi", "quand", "où", "bonjour", "salut", "merci",
+    "pardon", "excusez", "bien", "mal", "très", "aujourd", "demain", "hier",
+    "maintenant", "avoir", "être", "fait", "faire", "tout", "tous", "toute",
+    "cette", "ce", "cet", "mon", "ma", "mes", "ton", "ta", "votre", "vos",
+    "son", "sa", "ses", "leur", "chez", "sans", "sous", "aussi", "encore",
+    "déjà", "peut", "veux", "veut", "vais", "allez", "ça", "oui", "non",
+}
+
+_DE_WORDS = {
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem",
+    "und", "oder", "aber", "ist", "sind", "war", "waren", "bin", "bist",
+    "ich", "du", "er", "sie", "wir", "ihr", "nicht", "kein", "keine", "mit",
+    "für", "auf", "von", "zu", "aus", "bei", "nach", "über", "unter", "vor",
+    "wie", "was", "wer", "wo", "wann", "warum", "welche", "hallo", "guten",
+    "tag", "danke", "bitte", "entschuldigung", "gut", "schlecht", "sehr",
+    "heute", "morgen", "gestern", "jetzt", "haben", "hat", "habe", "sein",
+    "werden", "wird", "kann", "können", "muss", "soll", "will", "auch",
+    "noch", "schon", "immer", "sehen", "machen", "geht", "ja", "nein",
+}
+
+# Faqat fransuz/nemis tillariga xos diakritik belgilar.
+_FR_DIACRITICS = set("éèêàâçùûîïôœÉÈÊÀÂÇÙÛÎÏÔŒ")
+_DE_DIACRITICS = set("äöüßÄÖÜ")
+
 
 def _words(text: str) -> list[str]:
     return [w.lower() for w in _WORD_RE.findall(text)]
 
 
 def detect_lang(text: str) -> str:
-    """Matn tilini uz/ru/en orasidan taxmin qiladi (tarmoqqa chiqmaydi)."""
+    """Matn tilini LANGS ichidan taxmin qiladi (tarmoqqa chiqmaydi)."""
     stripped = text.strip()
     if not stripped:
         return "uz"
 
+    arabic = len(_ARABIC_RE.findall(stripped))
     cyrillic = len(_CYRILLIC_RE.findall(stripped))
     latin = len(_LATIN_RE.findall(stripped))
     words = _words(stripped)
+
+    if arabic > cyrillic and arabic > latin:
+        return "ar"
 
     if cyrillic > latin:
         # Kirill: o'zbek kirilliga xos harflar bo'lsa — o'zbekcha, aks holda rus.
@@ -157,23 +207,36 @@ def detect_lang(text: str) -> str:
     if latin == 0:
         return "uz"
 
-    # Lotin: o'zbek yoki ingliz.
-    uz_score = sum(w in _UZ_WORDS for w in words)
-    en_score = sum(w in _EN_WORDS for w in words)
+    # Lotin yozuvi: o'zbek, ingliz, fransuz yoki nemis.
+    scores = {
+        "uz": float(sum(w in _UZ_WORDS for w in words)),
+        "en": float(sum(w in _EN_WORDS for w in words)),
+        "fr": float(sum(w in _FR_WORDS for w in words)),
+        "de": float(sum(w in _DE_WORDS for w in words)),
+    }
 
+    chars = set(stripped)
     if _UZ_APOSTROPHE_RE.search(stripped):
-        uz_score += 2
+        scores["uz"] += 2
+    if chars & _FR_DIACRITICS:
+        scores["fr"] += 2
+    if chars & _DE_DIACRITICS:
+        scores["de"] += 2
 
     # "q" va "x" harflari inglizchada juda kam, o'zbekchada tez-tez uchraydi.
-    low = stripped.lower()
-    uz_score += min(low.count("q") + low.count("x"), 4) * 0.5
+    # Fransuzchada esa "que/qui" tufayli "q" ko'p — shuning uchun bu bonusni
+    # faqat fransuz/nemis izlari umuman bo'lmaganda beramiz.
+    if not scores["fr"] and not scores["de"]:
+        low = stripped.lower()
+        scores["uz"] += min(low.count("q") + low.count("x"), 4) * 0.5
 
-    if uz_score > en_score:
-        return "uz"
-    if en_score > uz_score:
+    best = max(scores, key=lambda lang: scores[lang])
+    if scores[best] <= 0:
+        # Hech qanday iz yo'q (qisqa matn) — inglizcha ehtimoli yuqoriroq.
         return "en"
-    # Teng bo'lsa — inglizcha ehtimoli yuqoriroq (qisqa matnlar uchun).
-    return "en"
+    # Teng bo'lsa LANGS tartibi hal qiladi; `max` birinchisini oladi, shuning
+    # uchun lug'at tartibi uz -> en -> fr -> de deb ataylab qo'yilgan.
+    return best
 
 
 # --------------------------------------------------------------------------
@@ -223,10 +286,13 @@ def _get_client() -> httpx.AsyncClient:
 
 async def close() -> None:
     """Bot to'xtaganda HTTP ulanishlarni yopadi."""
-    global _client
+    global _client, _gate
     if _client is not None and not _client.is_closed:
         await _client.aclose()
     _client = None
+    # Semaphore yopilgan event loop'ga bog'langan — keyingi ishga tushishda
+    # yangisi yaratilsin.
+    _gate = None
 
 
 async def _gtx_chunk(chunk: str, target: str) -> tuple[str, str | None]:
@@ -289,7 +355,8 @@ async def _translate_one(text: str, target: str) -> tuple[str, str | None]:
     for provider_name, provider in (("gtx", _translate_gtx), ("deep", _translate_deep)):
         for attempt in range(1, _ATTEMPTS + 1):
             try:
-                return await provider(text, target)
+                async with _get_gate():
+                    return await provider(text, target)
             except Exception as exc:
                 last_error = exc
                 log.warning(
@@ -311,7 +378,7 @@ async def _translate_one(text: str, target: str) -> tuple[str, str | None]:
 @dataclass
 class TranslationResult:
     source: str
-    """Aniqlangan manba til kodi (uz/ru/en)."""
+    """Aniqlangan manba til kodi (uz/ru/en/ar/fr/de)."""
     texts: dict[str, str]
     """Har bir til uchun matn. Manba tilida — asl matnning o'zi."""
     failed: list[str] = field(default_factory=list)
@@ -323,7 +390,7 @@ def _similar(a: str, b: str) -> float:
 
 
 async def translate_all(text: str, hint: str | None = None) -> TranslationResult:
-    """Matnni uchala tilga tarjima qiladi va manba tilini aniqlaydi.
+    """Matnni `LANGS` dagi barcha tillarga tarjima qiladi va manbani aniqlaydi.
 
     `hint` — tashqi manbadan (masalan Whisper'dan) kelgan til taxmini.
     Kamida bitta til tarjima qilinsa natija qaytadi; hech biri bo'lmasa
@@ -389,6 +456,9 @@ if __name__ == "__main__":
             "Salom, qalaysan? Bugun ishlar yaxshimi?",
             "Привет, как дела? Что нового?",
             "Hello, how are you doing today?",
+            "مرحبا، كيف حالك اليوم؟",
+            "Bonjour, comment ça va aujourd'hui ?",
+            "Hallo, wie geht es dir heute?",
         ]
         for sample in samples:
             res = await translate_all(sample)

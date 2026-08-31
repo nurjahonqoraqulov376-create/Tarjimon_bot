@@ -10,18 +10,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Qo'llab-quvvatlanadigan tillar. Kalit tartibi javobdagi tartibni belgilaydi.
-LANGS = ("uz", "ru", "en")
+LANGS = ("uz", "ru", "en", "ar", "fr", "de")
 
 LANG_NAMES = {
     "uz": "O'zbekcha",
     "ru": "Русский",
     "en": "English",
+    "ar": "العربية",
+    "fr": "Français",
+    "de": "Deutsch",
 }
 
 LANG_FLAGS = {
     "uz": "🇺🇿",
     "ru": "🇷🇺",
     "en": "🇬🇧",
+    "ar": "🇸🇦",
+    "fr": "🇫🇷",
+    "de": "🇩🇪",
 }
 
 

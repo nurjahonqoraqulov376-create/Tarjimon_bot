@@ -21,7 +21,7 @@ MAX_INPUT_CHARS = 4096
 
 
 def render(result: TranslationResult, ui_lang: str) -> str:
-    """Uchala tildagi natijani bitta xabar matniga yig'adi.
+    """Barcha tillardagi natijani bitta xabar matniga yig'adi.
 
     Manba til birinchi turadi va "asl matn" deb belgilanadi.
     """

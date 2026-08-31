@@ -1,6 +1,6 @@
-# 🌐 Tarjimon Bot — uz / ru / en
+# 🌐 Tarjimon Bot — uz / ru / en / ar / fr / de
 
-Telegram bot: **qaysi tilda yozsangiz ham**, javobda **uchala tildagi** tarjima
+Telegram bot: **qaysi tilda yozsangiz ham**, javobda **oltala tildagi** tarjima
 chiqadi. Ovozli xabar yuborsangiz — avval matnga o'giradi, keyin tarjima qiladi.
 
 ```
@@ -14,14 +14,23 @@ Bot:  🇺🇿 O'zbekcha · asl matn
 
       🇬🇧 English
       Hello, how are you?
+
+      🇸🇦 العربية
+      مرحبا، كيف حالك؟
+
+      🇫🇷 Français
+      Bonjour comment allez-vous ?
+
+      🇩🇪 Deutsch
+      Hallo, wie geht es dir?
 ```
 
 ## Imkoniyatlar
 
 - 🔄 **Avtomatik til aniqlash** — manba tilni ko'rsatish shart emas
-- 🌍 **Uchala tilda javob** — uz, ru, en bir xabarda
+- 🌍 **Oltala tilda javob** — uz, ru, en, ar, fr, de bir xabarda
 - 🎤 **Ovozli xabar** — faster-whisper orqali matnga o'girib tarjima qiladi
-- 🇺🇿🇷🇺🇬🇧 **Interfeys tili** — menyu va xabarlar siz tanlagan tilda
+- 🇺🇿🇷🇺🇬🇧🇸🇦🇫🇷🇩🇪 **Interfeys tili** — menyu va xabarlar siz tanlagan tilda
 - 💾 **SQLite** — sozlamalar bot qayta ishga tushsa ham saqlanadi
 - 💰 **Bepul tarjima** — API kaliti va to'lov kerak emas (deep-translator)
 
@@ -159,7 +168,7 @@ build qiladi (model image ichiga yangidan yuklanadi).
 | [translator.py](translator.py) | Tarjima, til aniqlash, bo'laklarga bo'lish, kesh |
 | [stt.py](stt.py) | Ovoz → matn, modelni lazy-load qilish va bo'shatish |
 | [db.py](db.py) | SQLite: foydalanuvchilar va statistika |
-| [i18n.py](i18n.py) | Interfeys matnlari (uz/ru/en) |
+| [i18n.py](i18n.py) | Interfeys matnlari (uz/ru/en/ar/fr/de) |
 | [handlers/](handlers/) | `/start`, matn, ovoz va boshqa xabarlar |
 
 ### Tarjima ishonchliligi
@@ -191,10 +200,18 @@ gtx endpoint manba tilni o'zi aytadi. U ishlamasa, zaxira yo'l:
 
 1. Whisper ishorasi (ovozli xabar bo'lsa)
 2. O'xshashlik — manba tilga "tarjima" asl matnga deyarli teng chiqadi
-3. **Heuristika** — alifbo (kirill/lotin), o'zbekcha tutuq belgilari (`o'`,
-   `g'`), o'zbek kirilligiga xos harflar (`ў қ ғ ҳ`) va stopword'lar
+3. **Heuristika** — alifbo (arab/kirill/lotin), o'zbekcha tutuq belgilari
+   (`o'`, `g'`), o'zbek kirilligiga xos harflar (`ў қ ғ ҳ`), fransuzcha
+   (`é è ç à`) va nemischa (`ä ö ü ß`) diakritikalar hamda stopword'lar
 
-Ovoz uchun Whisper tilni faqat **uz/ru/en orasidan** tanlaydi — aks holda u
-99 ta tildan noto'g'risini tanlab, ma'nosiz matn qaytarishi mumkin. Uchala
-tilning ehtimoli ham past bo'lsa (shovqin, musiqa, boshqa til), bot
-"tushunmadim" deb javob beradi.
+Ovoz uchun Whisper tilni faqat **qo'llab-quvvatlanadigan 6 til orasidan**
+tanlaydi — aks holda u 99 ta tildan noto'g'risini tanlab, ma'nosiz matn
+qaytarishi mumkin. Oltalasining ham ehtimoli past bo'lsa (shovqin, musiqa,
+boshqa til), bot "tushunmadim" deb javob beradi.
+
+### Nega bir vaqtda 3 ta so'rov
+
+Bitta xabar 6 tilga tarjima qilinadi. Oltala so'rovni birdan yuborsak
+Google'ning bepul endpoint'i "unusual traffic" deb bloklashi mumkin, shuning
+uchun `translator._MAX_PARALLEL` semaforasi bir vaqtda 3 tadan ko'p so'rov
+ketishiga yo'l qo'ymaydi.
