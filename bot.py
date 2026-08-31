@@ -88,8 +88,9 @@ async def main() -> None:
             return
         await set_commands(bot)
         log.info(
-            "Bot ishga tushdi: @%s | baza: %s | whisper: %s (%s)",
-            me.username, config.db_path, config.whisper_model, config.whisper_compute,
+            "Bot ishga tushdi: @%s | baza: %s | whisper: %s (%s, beam=%d)",
+            me.username, config.db_path, config.whisper_model,
+            config.whisper_compute, config.whisper_beam,
         )
         # Eski to'planib qolgan yangilanishlarni tashlab yuboramiz.
         await bot.delete_webhook(drop_pending_updates=True)

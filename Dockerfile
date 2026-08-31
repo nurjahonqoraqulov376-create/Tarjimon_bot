@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Whisper modelini image ichiga oldindan yuklaymiz: cold start tez bo'ladi
 # va model uchun volume joyi band qilinmaydi.
-ARG WHISPER_MODEL=base
+ARG WHISPER_MODEL=small
 RUN python -c "from huggingface_hub import snapshot_download; \
     snapshot_download('Systran/faster-whisper-${WHISPER_MODEL}')"
 

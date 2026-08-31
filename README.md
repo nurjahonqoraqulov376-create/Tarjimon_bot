@@ -101,7 +101,8 @@ Service → **Settings → Volumes → New Volume** → Mount path: `/data`
 | `BOT_TOKEN` | `123456:ABC-...` | BotFather'dan |
 | `DB_PATH` | `/data/bot.db` | volume ichida bo'lishi shart |
 | `ADMIN_ID` | `123456789` | `/stats` uchun |
-| `WHISPER_MODEL` | `base` | `tiny` / `base` / `small` |
+| `WHISPER_MODEL` | `small` | `tiny` / `base` / `small` |
+| `WHISPER_BEAM` | `5` | beam qidiruv kengligi (1 = tez, aniqligi past) |
 | `WHISPER_IDLE_UNLOAD_SEC` | `300` | bo'sh turgan modelni bo'shatish |
 | `MAX_VOICE_SEC` | `120` | maksimal ovoz uzunligi |
 | `THROTTLE_SEC` | `1.5` | flood himoyasi |
@@ -141,7 +142,7 @@ Shuning uchun bot maxsus qilib shunday yozilgan:
 - Model Docker image ichida tayyor turadi, shuning uchun qayta yuklash
   ~1.5 soniya oladi
 
-**Railway'da o'lchangan haqiqiy natijalar** (bo'sh turgan bot, production):
+**Railway'da `base` model bilan o'lchangan natijalar** (bo'sh turgan bot):
 
 | Resurs | O'lchov | Oylik |
 |---|---|---|
@@ -149,14 +150,15 @@ Shuning uchun bot maxsus qilib shunday yozilgan:
 | CPU | o'rtacha **0.003 vCPU** | ~$0.06 |
 | **Jami** | | **~$0.70/oy** |
 
-Ya'ni $5 kredit ichida ovoz tarjimasi uchun juda katta zaxira qoladi.
-(Ovoz qayta ishlanayotganda RAM qisqa muddatga ~400 MB gacha ko'tariladi,
-keyin `WHISPER_IDLE_UNLOAD_SEC` dan so'ng yana tushadi.)
-
-**Sifatni oshirmoqchi bo'lsangiz:** `WHISPER_MODEL=small` qo'ying — o'zbek tilini
-ancha yaxshi tushunadi, lekin RAM ~950 MB gacha ko'tariladi va faol botda oylik
-$5 dan oshib ketishi mumkin. O'zgartirgandan keyin Railway loyihani qayta
-build qiladi (model image ichiga yangidan yuklanadi).
+> ⚠️ **Default model `small` ga o'zgartirildi**, chunki `base` o'zbek nutqini
+> yetarlicha aniq eshitmasdi. Bo'sh turgan botning RAM sarfi o'zgarmaydi —
+> model xotirada faqat ovoz kelganda turadi va `WHISPER_IDLE_UNLOAD_SEC`
+> dan keyin bo'shatiladi. Ovoz qayta ishlanayotganda RAM ~400 MB o'rniga
+> ~950 MB gacha ko'tariladi, ya'ni **hisob ovozli xabarlar soniga bog'liq**.
+> Ovoz juda ko'p ishlatilsa va $5 kredit yetmasa, Railway'da
+> `WHISPER_MODEL=base` qo'ying yoki `WHISPER_IDLE_UNLOAD_SEC` ni kamaytiring
+> (masalan `120`). `WHISPER_BEAM=1` ham CPU sarfini tushiradi, lekin
+> aniqlikni pasaytiradi.
 
 ---
 
@@ -196,22 +198,74 @@ oshib boradi):
 
 ### Til qanday aniqlanadi
 
-gtx endpoint manba tilni o'zi aytadi. U ishlamasa, zaxira yo'l:
+Bu botning eng nozik joyi. **`sl=auto` ataylab ishlatilmaydi.**
 
-1. Whisper ishorasi (ovozli xabar bo'lsa)
-2. O'xshashlik — manba tilga "tarjima" asl matnga deyarli teng chiqadi
-3. **Heuristika** — alifbo (arab/kirill/lotin), o'zbekcha tutuq belgilari
-   (`o'`, `g'`), o'zbek kirilligiga xos harflar (`ў қ ғ ҳ`), fransuzcha
-   (`é è ç à`) va nemischa (`ä ö ü ß`) diakritikalar hamda stopword'lar
+Google avtomatik aniqlashda ~130 til ichidan tanlaydi va qisqa matnda
+muntazam ravishda biz qo'llamaydigan tilni tanlaydi. O'lchangan haqiqiy
+javoblar:
+
+| Matn | Google aytdi | `sl=auto` bilan tarjima |
+|---|---|---|
+| `Qalaysan` | `so` (somali) | ❌ "Dry" / "Сухой" |
+| `Rahmat` | `id` (indonez) | ❌ "Grace" / "Милость" |
+| `Danke schoen` | `nl` (golland) | ❌ "Thank you shoe" |
+
+Bitta xato **ikki** joyni buzadi: tarjima noto'g'ri chiqadi va xabardagi
+"asl matn" yorlig'i noto'g'ri tilga yopishtiriladi — o'zbekcha matn
+"🇬🇧 English · asl matn" bo'lib ko'rinadi.
+
+Shuning uchun manba til avval aniqlanadi, keyin **barcha** tarjimalar aniq
+`sl=<manba>` bilan so'raladi. Aniqlash tartibi:
+
+1. **Yozuv** — arab yozuvi faqat `ar`, kirill faqat `ru`/`uz`, lotin esa
+   `uz`/`en`/`fr`/`de` bo'lishi mumkin. Bu eng ishonchli dalil va arab
+   matni uchun umuman so'rov yubormaydi.
+2. **Google** — javobi shu chegara ichiga keltiriladi. Qo'llanmaydigan til
+   aytsa, eng yaqin tilimizga o'tkaziladi (`so`/`id`/`tr` → `uz`,
+   `nl`/`af` → `de`, `ca`/`it` → `fr`).
+3. **Lug'at dalili** — qisqa (≤2 so'z) matnda Google bitta so'zga qarab
+   hukm chiqaradi va adashadi (`Bonjour` → `en`). Lug'atimizda haqiqiy
+   dalil bo'lsa — lug'atdagi so'z, `o'`/`g'` tutuq belgisi, `é è ç` yoki
+   `ä ö ü ß` diakritikasi — o'shanga ishonamiz.
+4. **Interfeys tili zondi** — dalilsiz qisqa matn hali ham ikki ma'noli:
+   `Suv` ni Google `en` (SUV) deydi. Matnni foydalanuvchining interfeys
+   tilidan tarjima qilib ko'ramiz; natija haqiqatan o'zgarsa (`Suv` →
+   "Water"), demak matn o'sha tilda. Inglizcha `Hello` ni o'zbekchadan
+   tarjima qilsak o'zgarmaydi va biz Google javobida qolamiz.
+5. **Oflayn heuristika** — Google umuman javob bermasa ishlaydi:
+   alifbo, o'zbekcha qo'shimchalar (`-lar`, `-ning`, `-yapman`),
+   stopword'lar va diakritikalar.
+
+Shu sababli `Non` so'zi o'zbek foydalanuvchi uchun "bread", fransuz
+foydalanuvchi uchun "no" deb o'qiladi — teng dalilda interfeys tili hal
+qiladi.
 
 Ovoz uchun Whisper tilni faqat **qo'llab-quvvatlanadigan 6 til orasidan**
 tanlaydi — aks holda u 99 ta tildan noto'g'risini tanlab, ma'nosiz matn
 qaytarishi mumkin. Oltalasining ham ehtimoli past bo'lsa (shovqin, musiqa,
 boshqa til), bot "tushunmadim" deb javob beradi.
 
+### Ovoz sifati
+
+Ovozli xabar aniqligi uchun:
+
+- `WHISPER_MODEL=small` — `base` o'zbekchani ancha yomon eshitadi
+- `WHISPER_BEAM=5` — greedy (`1`) qidiruv tez, lekin so'zlarni chalkashtiradi
+- harorat zaxirasi (`0.0 → 1.0`) — natija ishonchsiz chiqsa qayta uriladi
+- VAD `min_silence_duration_ms=700` — gap o'rtasidagi tabiiy pauza kesilmaydi
+
+Model faqat ovoz kelganda yuklanadi va `WHISPER_IDLE_UNLOAD_SEC` dan keyin
+xotiradan bo'shatiladi, shuning uchun `small` doimiy RAM sarfini oshirmaydi.
+
 ### Nega bir vaqtda 3 ta so'rov
 
 Bitta xabar 6 tilga tarjima qilinadi. Oltala so'rovni birdan yuborsak
-Google'ning bepul endpoint'i "unusual traffic" deb bloklashi mumkin, shuning
-uchun `translator._MAX_PARALLEL` semaforasi bir vaqtda 3 tadan ko'p so'rov
-ketishiga yo'l qo'ymaydi.
+Google'ning bepul endpoint'i "unusual traffic" deb bloklaydi — ishlab chiqish
+paytida haqiqatan ro'y berdi: `302 Found` → `google.com/sorry/index`.
+Shuning uchun:
+
+- `translator._MAX_PARALLEL` bir vaqtda 3 tadan ko'p so'rovga yo'l qo'ymaydi
+- kesh (`_CACHE_SIZE`) takroriy iboralarni umuman so'ramaydi
+- `302`/`429` ko'ringanda gtx **120 soniyaga chetlab o'tiladi** — aks holda
+  qolgan 5 til uchun ham 3 martadan urinib, blokni uzaytirar edik
+- qayta urinish kechikishiga jitter qo'shilgan

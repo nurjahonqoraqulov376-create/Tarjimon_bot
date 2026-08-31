@@ -30,7 +30,7 @@ async def on_text(message: Message, lang: str) -> None:
 
     status = await message.answer(t("translating", lang))
     try:
-        result = await translate_all(source_text)
+        result = await translate_all(source_text, ui_lang=lang)
     except TranslationError as exc:
         log.warning("Tarjima muvaffaqiyatsiz: %s", exc)
         await status.edit_text(t("error", lang))

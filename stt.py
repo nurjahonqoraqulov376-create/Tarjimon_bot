@@ -102,11 +102,25 @@ def _transcribe_blocking(model, path: str) -> tuple[str, str | None]:
     except Exception as exc:
         log.warning("Til aniqlanmadi, Whisper o'zi tanlaydi: %s", exc)
 
+    assert _config is not None
     segments, info = model.transcribe(
         audio,
         language=language,
-        beam_size=1,          # greedy — CPU'da ancha tez
-        vad_filter=True,      # jimlikni tashlab ketadi
+        # Greedy (beam_size=1) qidiruv CPU'da tez, lekin so'zlarni chalkashtirib
+        # yuboradi — ayniqsa o'zbekchada. Beam qidiruv sezilarli aniqroq.
+        beam_size=_config.whisper_beam,
+        best_of=_config.whisper_beam,
+        # Bitta harorat bilan cheklanmaymiz: natija ishonchsiz chiqsa
+        # (takrorlanish yoki past ehtimol) Whisper yuqoriroq harorat bilan
+        # qayta uradi. Busiz qiyin joylar shunchaki axlat bo'lib qoladi.
+        temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        compression_ratio_threshold=2.4,   # takrorlanib ketgan matnni rad etadi
+        log_prob_threshold=-1.0,           # ishonchsiz segmentni qayta uradi
+        no_speech_threshold=0.6,
+        vad_filter=True,                   # jimlikni tashlab ketadi
+        # Jimlik chegarasi kattaroq bo'lsa VAD gap o'rtasidagi tabiiy
+        # pauzalarni kesib, so'zlarni yeb qo'ymaydi.
+        vad_parameters={"min_silence_duration_ms": 700, "speech_pad_ms": 300},
         condition_on_previous_text=False,
     )
     text = "".join(segment.text for segment in segments).strip()

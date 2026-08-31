@@ -66,7 +66,7 @@ async def on_voice(message: Message, lang: str, bot: Bot, config: Config) -> Non
             return
 
         await status.edit_text(t("translating", lang))
-        result = await translate_all(transcript, hint=detected)
+        result = await translate_all(transcript, hint=detected, ui_lang=lang)
     except TranslationError as exc:
         log.warning("Ovoz tarjimasi muvaffaqiyatsiz: %s", exc)
         await status.edit_text(t("error", lang))

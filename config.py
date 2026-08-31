@@ -52,6 +52,7 @@ class Config:
     db_path: str
     whisper_model: str
     whisper_compute: str
+    whisper_beam: int
     whisper_idle_unload_sec: int
     max_voice_sec: int
     throttle_sec: float
@@ -69,8 +70,12 @@ def load_config() -> Config:
         bot_token=token,
         admin_id=_int_env("ADMIN_ID", 0),
         db_path=os.getenv("DB_PATH", "").strip() or "bot.db",
-        whisper_model=os.getenv("WHISPER_MODEL", "").strip() or "base",
+        # `small` o'zbekchani `base` dan sezilarli aniqroq eshitadi. RAM faqat
+        # ovoz qayta ishlanayotganda band bo'ladi — `WHISPER_IDLE_UNLOAD_SEC`
+        # dan keyin model xotiradan bo'shatiladi.
+        whisper_model=os.getenv("WHISPER_MODEL", "").strip() or "small",
         whisper_compute=os.getenv("WHISPER_COMPUTE", "").strip() or "int8",
+        whisper_beam=max(1, _int_env("WHISPER_BEAM", 5)),
         whisper_idle_unload_sec=_int_env("WHISPER_IDLE_UNLOAD_SEC", 300),
         max_voice_sec=_int_env("MAX_VOICE_SEC", 120),
         throttle_sec=_float_env("THROTTLE_SEC", 1.5),
