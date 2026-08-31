@@ -17,6 +17,7 @@ from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats
 
 import db
 import stt
+import translator
 from config import LANGS, Config, load_config
 from handlers import build_router
 from i18n import COMMAND_DESCRIPTIONS
@@ -50,6 +51,9 @@ async def main() -> None:
         stream=sys.stdout,
     )
     logging.getLogger("aiogram.event").setLevel(logging.WARNING)
+    # httpx har bir tarjima so'rovini INFO'da yozadi — loglar shovqinga to'ladi.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     config: Config = load_config()
 
@@ -99,6 +103,7 @@ async def main() -> None:
             await unloader
         except asyncio.CancelledError:
             pass
+        await translator.close()
         await db.close()
         await bot.session.close()
         log.info("Bot to'xtatildi")

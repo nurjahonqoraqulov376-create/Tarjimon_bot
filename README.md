@@ -162,16 +162,37 @@ build qiladi (model image ichiga yangidan yuklanadi).
 | [i18n.py](i18n.py) | Interfeys matnlari (uz/ru/en) |
 | [handlers/](handlers/) | `/start`, matn, ovoz va boshqa xabarlar |
 
+### Tarjima ishonchliligi
+
+Ikkita mustaqil provayder ketma-ket sinaladi (har biri 3 martadan, kechikish
+oshib boradi):
+
+1. **gtx JSON endpoint** — `translate.googleapis.com/translate_a/single`.
+   JSON qaytaradi va **aniqlangan manba tilni ham** beradi.
+2. **deep-translator** — birinchisi ishlamasa.
+
+> ⚠️ **Nega bu shunday qilingan.** `deep-translator` Google sahifasini
+> "scrape" qiladi. Google 500 xatosi qaytarganda u **xato sahifasining
+> matnini muvaffaqiyatli tarjima sifatida** qaytaradi:
+> `"Error 500 (Server Error)!!1500.That's an error..."` — va hech qanday
+> exception ko'tarmaydi, ya'ni qayta urinish ham ishlamaydi.
+> Bu haqiqiy foydalanuvchida ro'y bergan.
+>
+> Shuning uchun **har bir natija `_looks_like_error_page()` bilan
+> tekshiriladi**. Tekshiruv `lru_cache` ning ichida turadi — aks holda axlat
+> javob keshga tushib, barcha keyingi urinishlar ham o'shani qaytaraverardi.
+>
+> Ikkala provayder ham yiqilsa, foydalanuvchi **tushunarli xato xabari**
+> oladi — hech qachon axlat matn emas.
+
 ### Til qanday aniqlanadi
 
-deep-translator manba tilni qaytarmaydi, `langdetect` esa o'zbek tilini bilmaydi.
-Shuning uchun ikki bosqich ishlatiladi:
+gtx endpoint manba tilni o'zi aytadi. U ishlamasa, zaxira yo'l:
 
-1. **Heuristika** — alifbo (kirill/lotin), o'zbekcha tutuq belgilari (`o'`, `g'`),
-   o'zbek kirilligiga xos harflar (`ў қ ғ ҳ`) va stopword'lar.
-2. **Tasdiqlash** — matn baribir uchala tilga tarjima qilinadi; manba tilga
-   tarjima natijasi asl matnga deyarli teng chiqadi. Qo'shimcha so'rov
-   talab qilmaydi va heuristika xatosini tuzatadi.
+1. Whisper ishorasi (ovozli xabar bo'lsa)
+2. O'xshashlik — manba tilga "tarjima" asl matnga deyarli teng chiqadi
+3. **Heuristika** — alifbo (kirill/lotin), o'zbekcha tutuq belgilari (`o'`,
+   `g'`), o'zbek kirilligiga xos harflar (`ў қ ғ ҳ`) va stopword'lar
 
 Ovoz uchun Whisper tilni faqat **uz/ru/en orasidan** tanlaydi — aks holda u
 99 ta tildan noto'g'risini tanlab, ma'nosiz matn qaytarishi mumkin. Uchala

@@ -30,6 +30,8 @@ def render(result: TranslationResult, ui_lang: str) -> str:
     for lang in order:
         text = result.texts.get(lang)
         if not text:
+            # Bu til tarjima qilinmadi — uni ko'rsatmaganimiz, noto'g'ri
+            # matn ko'rsatganimizdan yaxshiroq.
             continue
         header = f"{LANG_FLAGS[lang]} <b>{LANG_NAMES[lang]}</b>"
         if lang == result.source:

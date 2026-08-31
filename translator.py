@@ -1,12 +1,18 @@
 """Matnni uchala tilga (uz/ru/en) tarjima qilish va manba tilini aniqlash.
 
-deep-translator manba tilini qaytarmaydi, `langdetect` esa o'zbek tilini bilmaydi.
-Shuning uchun manba til ikki bosqichda aniqlanadi:
+Ishonchlilik uchun ikkita mustaqil provayder ishlatiladi:
 
-1. Heuristika — alifbo, o'zbekcha/inglizcha markerlar va stopword'lar bo'yicha.
-2. Tasdiqlash — matn baribir uchala tilga tarjima qilinadi, manba tilga tarjima
-   natijasi kirish matniga deyarli teng chiqadi. Bu qo'shimcha so'rov talab
-   qilmaydi va heuristikaning xatosini tuzatadi.
+1. **gtx JSON endpoint** (asosiy) — `translate.googleapis.com/translate_a/single`.
+   JSON qaytaradi va **aniqlangan manba tilni ham** beradi. Google xato
+   sahifasi qaytarsa, u JSON sifatida o'qilmaydi va haqiqiy xato ko'tariladi.
+2. **deep-translator** (zaxira) — birinchisi ishlamasa.
+
+Nega bu muhim: `deep-translator` translate.google.com sahifasini "scrape"
+qiladi va Google 500 xatosi qaytarganda **xato sahifasining matnini muvaffaqiyatli
+tarjima sifatida** qaytaradi ("Error 500 (Server Error)!!1..."). Exception
+ko'tarilmagani uchun qayta urinish ham ishlamaydi va foydalanuvchiga axlat
+matn boradi. Shuning uchun har bir natija `_looks_like_error_page()` bilan
+tekshiriladi.
 """
 
 from __future__ import annotations
@@ -14,11 +20,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from functools import lru_cache
 
+import httpx
 from deep_translator import GoogleTranslator
 
 from config import LANGS
@@ -27,15 +33,65 @@ log = logging.getLogger(__name__)
 
 # Google'ning bepul endpoint'i bitta so'rovda ~5000 belgini qabul qiladi.
 MAX_CHUNK = 4500
-# Manba tilni tasdiqlash chegarasi: tarjima kirish matniga shunchalik o'xshasa,
-# demak bu til matnning o'z tili.
+# Manba tilni tasdiqlash chegarasi (faqat zaxira yo'l uchun).
 SAME_TEXT_RATIO = 0.92
 
-_RETRIES = 3
+GTX_URL = "https://translate.googleapis.com/translate_a/single"
+_TIMEOUT = httpx.Timeout(20.0, connect=10.0)
+_HEADERS = {
+    # Standart httpx User-Agent'i tez-tez bloklanadi.
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    )
+}
+
+_ATTEMPTS = 3
+_client: httpx.AsyncClient | None = None
+
+
+class TranslationError(RuntimeError):
+    """Tarjima xizmatiga ulanib bo'lmadi yoki javob yaroqsiz."""
 
 
 # --------------------------------------------------------------------------
-# Til aniqlash (heuristika)
+# Javobni tekshirish
+# --------------------------------------------------------------------------
+
+# Google xato sahifalari va bloklash xabarlarining izlari.
+_ERROR_SIGNATURES = (
+    "that's an error",
+    "that’s an error",
+    "there was an error",
+    "please try again later",
+    "that's all we know",
+    "that’s all we know",
+    "server error)!!",
+    "our systems have detected unusual traffic",
+    "<!doctype html",
+    "<html",
+)
+
+
+def _looks_like_error_page(text: str) -> bool:
+    """Tarjima o'rniga Google xato sahifasi kelganini aniqlaydi."""
+    low = text.lower()
+    return any(sig in low for sig in _ERROR_SIGNATURES)
+
+
+def _validate(translated: str, provider: str, target: str) -> str:
+    if not translated or not translated.strip():
+        raise TranslationError(f"{provider}: bo'sh javob ({target})")
+    if _looks_like_error_page(translated):
+        log.warning(
+            "%s xato sahifasini qaytardi (%s): %.120r", provider, target, translated
+        )
+        raise TranslationError(f"{provider}: xato sahifasi ({target})")
+    return translated
+
+
+# --------------------------------------------------------------------------
+# Til aniqlash (heuristika — faqat zaxira yo'l uchun)
 # --------------------------------------------------------------------------
 
 _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
@@ -50,13 +106,14 @@ _UZ_APOSTROPHE_RE = re.compile(r"[og][‘’ʻʼ'`]", re.IGNORECASE)
 
 _UZ_WORDS = {
     "va", "bilan", "uchun", "men", "sen", "biz", "siz", "ular", "bu", "shu",
-    "qanday", "qanaqa", "nima", "kim", "qayer", "qachon", "yaxshi", "yomon",
-    "kerak", "bor", "yoq", "yo", "ha", "emas", "ham", "lekin", "ammo", "chunki",
-    "salom", "rahmat", "iltimos", "kechirasiz", "qalay", "qalaysan", "xayr",
-    "bugun", "ertaga", "kecha", "hozir", "keyin", "juda", "koproq", "ozgina",
-    "boldi", "boladi", "qildim", "qilaman", "aytdi", "dedi", "bordi", "keldi",
-    "menga", "senga", "bizga", "sizga", "uni", "meni", "seni", "ishlar",
-    "yaxshimisiz", "assalomu", "alaykum", "tarjima", "til", "gap", "so", "soz",
+    "qanday", "qanaqa", "nima", "kim", "qayer", "qayerdansiz", "qachon",
+    "yaxshi", "yomon", "kerak", "bor", "yoq", "yo", "ha", "emas", "ham",
+    "lekin", "ammo", "chunki", "salom", "rahmat", "iltimos", "kechirasiz",
+    "qalay", "qalaysan", "xayr", "bugun", "ertaga", "kecha", "hozir", "keyin",
+    "juda", "koproq", "ozgina", "boldi", "boladi", "qildim", "qilaman",
+    "aytdi", "dedi", "bordi", "keldi", "menga", "senga", "bizga", "sizga",
+    "uni", "meni", "seni", "ishlar", "yaxshimisiz", "assalomu", "alaykum",
+    "tarjima", "til", "gap", "so", "soz",
 }
 
 _EN_WORDS = {
@@ -92,13 +149,9 @@ def detect_lang(text: str) -> str:
     words = _words(stripped)
 
     if cyrillic > latin:
-        # Kirill: rus yoki o'zbek kirilli.
+        # Kirill: o'zbek kirilliga xos harflar bo'lsa — o'zbekcha, aks holda rus.
         if _UZ_CYRILLIC_CHARS & set(stripped):
             return "uz"
-        if words and sum(w in _RU_WORDS for w in words) == 0:
-            # Ruscha stopword umuman yo'q — o'zbek kirilli bo'lishi mumkin,
-            # lekin ishonch kam, shuning uchun baribir "ru" deymiz.
-            return "ru"
         return "ru"
 
     if latin == 0:
@@ -124,7 +177,7 @@ def detect_lang(text: str) -> str:
 
 
 # --------------------------------------------------------------------------
-# Tarjima
+# Bo'laklarga bo'lish
 # --------------------------------------------------------------------------
 
 
@@ -135,10 +188,8 @@ def _split_chunks(text: str, limit: int = MAX_CHUNK) -> list[str]:
 
     chunks: list[str] = []
     current = ""
-    # Gap oxiri yoki qator boshi bo'yicha bo'lamiz.
     for part in re.split(r"(?<=[.!?…\n])\s+", text):
         while len(part) > limit:
-            # Bitta "gap" ham juda uzun bo'lsa — majburan kesamiz.
             if current:
                 chunks.append(current)
                 current = ""
@@ -154,34 +205,107 @@ def _split_chunks(text: str, limit: int = MAX_CHUNK) -> list[str]:
     return chunks
 
 
+# --------------------------------------------------------------------------
+# Provayderlar
+# --------------------------------------------------------------------------
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(
+            timeout=_TIMEOUT,
+            headers=_HEADERS,
+            limits=httpx.Limits(max_connections=8, max_keepalive_connections=4),
+        )
+    return _client
+
+
+async def close() -> None:
+    """Bot to'xtaganda HTTP ulanishlarni yopadi."""
+    global _client
+    if _client is not None and not _client.is_closed:
+        await _client.aclose()
+    _client = None
+
+
+async def _gtx_chunk(chunk: str, target: str) -> tuple[str, str | None]:
+    """gtx JSON endpoint orqali bitta bo'lakni tarjima qiladi."""
+    resp = await _get_client().post(
+        GTX_URL,
+        params={"client": "gtx", "sl": "auto", "tl": target, "dt": "t"},
+        data={"q": chunk},
+    )
+    resp.raise_for_status()
+    # Xato sahifasi HTML bo'ladi va bu yerda xato ko'taradi — bizga aynan
+    # shu kerak, chunki keyin qayta urinish va zaxira provayder ishlaydi.
+    data = resp.json()
+
+    if not isinstance(data, list) or not data or not isinstance(data[0], list):
+        raise TranslationError("gtx: kutilmagan javob tuzilishi")
+
+    translated = "".join(seg[0] for seg in data[0] if seg and seg[0])
+    detected = data[2] if len(data) > 2 and isinstance(data[2], str) else None
+    return translated, detected
+
+
+async def _translate_gtx(text: str, target: str) -> tuple[str, str | None]:
+    parts: list[str] = []
+    detected: str | None = None
+    for chunk in _split_chunks(text):
+        translated, chunk_lang = await _gtx_chunk(chunk, target)
+        parts.append(translated)
+        detected = detected or chunk_lang
+    return _validate(" ".join(parts).strip(), "gtx", target), detected
+
+
 @lru_cache(maxsize=512)
-def _translate_chunk(chunk: str, target: str) -> str:
-    """Bitta bo'lakni tarjima qiladi. Natija keshlanadi."""
-    return GoogleTranslator(source="auto", target=target).translate(chunk) or ""
+def _deep_chunk(chunk: str, target: str) -> str:
+    """Bitta bo'lakni tarjima qiladi va natijani keshlaydi.
+
+    Tekshiruv ATAYLAB shu yerda — kesh ichida. Agar xato sahifasi kelsa,
+    funksiya xato ko'taradi va `lru_cache` hech narsa saqlamaydi. Aks holda
+    axlat javob keshga tushib qolar va barcha qayta urinishlar ham o'sha
+    axlatni qaytaraverardi.
+    """
+    raw = GoogleTranslator(source="auto", target=target).translate(chunk) or ""
+    return _validate(raw, "deep-translator", target)
 
 
-def _translate_sync(text: str, target: str) -> str:
-    """Bloklovchi tarjima (thread ichida chaqiriladi), qayta urinish bilan."""
+def _translate_deep_blocking(text: str, target: str) -> str:
+    joined = " ".join(_deep_chunk(chunk, target) for chunk in _split_chunks(text))
+    return joined.strip()
+
+
+async def _translate_deep(text: str, target: str) -> tuple[str, str | None]:
+    # deep-translator bloklovchi — alohida threadda ishlatamiz.
+    return await asyncio.to_thread(_translate_deep_blocking, text, target), None
+
+
+async def _translate_one(text: str, target: str) -> tuple[str, str | None]:
+    """Bitta tilga tarjima: provayderlar va qayta urinishlar bilan."""
     last_error: Exception | None = None
-    for attempt in range(_RETRIES):
-        try:
-            return " ".join(
-                _translate_chunk(chunk, target) for chunk in _split_chunks(text)
-            ).strip()
-        except Exception as exc:  # deep_translator turli xatolar tashlaydi
-            last_error = exc
-            log.warning(
-                "Tarjima xatosi (%s, urinish %d/%d): %s",
-                target, attempt + 1, _RETRIES, exc,
-            )
-            if attempt < _RETRIES - 1:
-                # Alohida thread ichida ishlaymiz — event loop bloklanmaydi.
-                time.sleep(0.6 * (2**attempt))
-    raise TranslationError(str(last_error)) from last_error
+
+    for provider_name, provider in (("gtx", _translate_gtx), ("deep", _translate_deep)):
+        for attempt in range(1, _ATTEMPTS + 1):
+            try:
+                return await provider(text, target)
+            except Exception as exc:
+                last_error = exc
+                log.warning(
+                    "Tarjima muvaffaqiyatsiz [%s -> %s] urinish %d/%d: %s: %s",
+                    provider_name, target, attempt, _ATTEMPTS,
+                    type(exc).__name__, exc,
+                )
+                if attempt < _ATTEMPTS:
+                    await asyncio.sleep(0.5 * 2 ** (attempt - 1))
+
+    raise TranslationError(f"{target}: {type(last_error).__name__}: {last_error}")
 
 
-class TranslationError(RuntimeError):
-    """Tarjima xizmatiga ulanib bo'lmadi."""
+# --------------------------------------------------------------------------
+# Asosiy funksiya
+# --------------------------------------------------------------------------
 
 
 @dataclass
@@ -190,6 +314,8 @@ class TranslationResult:
     """Aniqlangan manba til kodi (uz/ru/en)."""
     texts: dict[str, str]
     """Har bir til uchun matn. Manba tilida — asl matnning o'zi."""
+    failed: list[str] = field(default_factory=list)
+    """Tarjima qilib bo'lmagan tillar (odatda bo'sh)."""
 
 
 def _similar(a: str, b: str) -> float:
@@ -200,62 +326,82 @@ async def translate_all(text: str, hint: str | None = None) -> TranslationResult
     """Matnni uchala tilga tarjima qiladi va manba tilini aniqlaydi.
 
     `hint` — tashqi manbadan (masalan Whisper'dan) kelgan til taxmini.
+    Kamida bitta til tarjima qilinsa natija qaytadi; hech biri bo'lmasa
+    `TranslationError` ko'tariladi.
     """
     text = text.strip()
     if not text:
         raise ValueError("Bo'sh matn")
 
     results = await asyncio.gather(
-        *(asyncio.to_thread(_translate_sync, text, lang) for lang in LANGS),
+        *(_translate_one(text, lang) for lang in LANGS),
         return_exceptions=True,
     )
 
     texts: dict[str, str] = {}
-    errors: list[Exception] = []
+    detected_votes: list[str] = []
+    failed: list[str] = []
+    first_error: Exception | None = None
+
     for lang, result in zip(LANGS, results):
-        if isinstance(result, Exception):
-            errors.append(result)
-        elif result:
-            texts[lang] = result
+        if isinstance(result, BaseException):
+            failed.append(lang)
+            first_error = first_error or result
+            continue
+        translated, detected = result
+        texts[lang] = translated
+        if detected in LANGS:
+            detected_votes.append(detected)
 
     if not texts:
-        raise TranslationError(str(errors[0]) if errors else "noma'lum xato")
+        raise TranslationError(str(first_error) if first_error else "noma'lum xato")
 
-    # Manba tilni aniqlash: tarjimasi asl matnga eng o'xshash til.
-    ratios = {lang: _similar(text, out) for lang, out in texts.items()}
-    best_lang = max(ratios, key=ratios.get)
-    if ratios[best_lang] >= SAME_TEXT_RATIO:
-        source = best_lang
+    # Manba til: 1) provayder aytgani, 2) tashqi ishora, 3) o'xshashlik,
+    # 4) heuristika.
+    if detected_votes:
+        source = max(set(detected_votes), key=detected_votes.count)
     elif hint in LANGS:
         source = hint
     else:
-        source = detect_lang(text)
+        ratios = {lang: _similar(text, out) for lang, out in texts.items()}
+        best = max(ratios, key=ratios.get)
+        source = best if ratios[best] >= SAME_TEXT_RATIO else detect_lang(text)
 
-    # Manba tilda asl matnni ko'rsatamiz — Google uni "tarjima" qilib
-    # o'zgartirib yuborgan bo'lishi mumkin.
+    # Manba tilda asl matnni ko'rsatamiz — tarjimon uni o'zgartirgan bo'lishi
+    # mumkin.
     texts[source] = text
-    return TranslationResult(source=source, texts=texts)
+    if source in failed:
+        failed.remove(source)
+
+    if failed:
+        log.warning("Tarjima qilinmagan tillar: %s", ", ".join(failed))
+
+    return TranslationResult(source=source, texts=texts, failed=failed)
 
 
 if __name__ == "__main__":
     # Botsiz tez sinov: python translator.py
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     async def _smoke() -> None:
         samples = [
+            "Qayerdansiz",
             "Salom, qalaysan? Bugun ishlar yaxshimi?",
             "Привет, как дела? Что нового?",
             "Hello, how are you doing today?",
         ]
         for sample in samples:
             res = await translate_all(sample)
-            print(f"\n--- {sample!r}")
-            print(f"heuristika: {detect_lang(sample)} | aniqlangan: {res.source}")
+            print(f"\n--- {sample!r}  (manba: {res.source}, xato: {res.failed})")
             for lang in LANGS:
                 print(f"  {lang}: {res.texts.get(lang)}")
 
         long_text = "Bu juda uzun matn. " * 400
         res = await translate_all(long_text)
-        print(f"\n--- uzun matn ({len(long_text)} belgi) -> {len(res.texts['en'])} belgi (en)")
+        print(f"\n--- uzun matn ({len(long_text)}) -> en {len(res.texts['en'])} belgi")
+
+        bad = "Error 500 (Server Error)!!1500.That's an error.There was an error."
+        print(f"\nXato sahifasi aniqlandimi: {_looks_like_error_page(bad)}")
+        await close()
 
     asyncio.run(_smoke())
