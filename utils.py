@@ -60,25 +60,94 @@ def rss_mb() -> int:
         return 0
 
 
-def split_for_telegram(text: str, limit: int = 4000) -> list[str]:
-    """Uzun javobni Telegram'ning 4096 belgilik chegarasiga moslab bo'ladi."""
-    if len(text) <= limit:
+# Telegram xabarining chegarasi. Diqqat: Telegram uzunlikni **UTF-16 kod
+# birliklarida** sanaydi, Python esa kod nuqtalarida. 🇺🇿 kabi bayroq emoji
+# Python uchun 2 belgi, Telegram uchun esa 4 birlik — shuning uchun oddiy
+# `len()` ga tayanib bo'lmaydi.
+TELEGRAM_LIMIT = 4096
+# Zaxira qoldiramiz: xabar chekkasida qo'shiladigan narsalar bo'lishi mumkin.
+SAFE_LIMIT = 3800
+
+
+def tg_len(text: str) -> int:
+    """Telegram xabarni qanday o'lchasa, shunday o'lchaydi (UTF-16 birliklar)."""
+    return sum(2 if ord(ch) > 0xFFFF else 1 for ch in text)
+
+
+def _prefix_len(text: str, limit: int) -> int:
+    """`limit` UTF-16 birlikka sig'adigan belgilar sonini qaytaradi."""
+    total = 0
+    for index, ch in enumerate(text):
+        total += 2 if ord(ch) > 0xFFFF else 1
+        if total > limit:
+            return index
+    return len(text)
+
+
+def _hard_split(text: str, limit: int) -> list[str]:
+    """Bitta juda uzun qatorni bo'ladi — so'z chegarasini afzal ko'radi.
+
+    Bo'sh joyda kesish HTML uchun ham xavfsiz: `html.escape` chiqaradigan
+    `&amp;` / `&lt;` / `&gt;` ichida bo'sh joy yo'q, ya'ni entity hech qachon
+    ikkiga bo'linib qolmaydi. Bo'sh joy topilmasa — entity boshlanishidan
+    oldin kesamiz.
+    """
+    parts: list[str] = []
+    while tg_len(text) > limit:
+        cut = _prefix_len(text, limit)
+        window = text[:cut]
+        space = window.rfind(" ")
+        if space > cut // 2:
+            cut = space + 1
+        else:
+            # So'z chegarasi yo'q — hech bo'lmasa entity'ni buzmaymiz.
+            amp = window.rfind("&")
+            if amp > 0 and ";" not in window[amp:]:
+                cut = amp
+        head, text = text[:cut].rstrip(), text[cut:].lstrip()
+        if head:
+            parts.append(head)
+    if text:
+        parts.append(text)
+    return parts
+
+
+def split_for_telegram(text: str, limit: int = SAFE_LIMIT) -> list[str]:
+    """Uzun javobni Telegram chegarasiga moslab bo'ladi.
+
+    Qatorlar butunligicha saqlanadi, ya'ni til sarlavhasi o'z matnidan
+    ajralib qolmaydi. Bo'sh bo'lak hech qachon qaytmaydi — Telegram bo'sh
+    xabarni rad etadi va butun yuborish to'xtab qolardi.
+    """
+    if tg_len(text) <= limit:
         return [text]
 
     parts: list[str] = []
     current = ""
-    for line in text.split("\n"):
-        while len(line) > limit:
-            if current:
-                parts.append(current)
-                current = ""
-            parts.append(line[:limit])
-            line = line[limit:]
-        if len(current) + len(line) + 1 > limit:
+
+    def flush() -> None:
+        nonlocal current
+        if current.strip():
             parts.append(current)
+        current = ""
+
+    for line in text.split("\n"):
+        if tg_len(line) > limit:
+            # Qatorning o'zi sig'maydi. To'plangan matnni (odatda til
+            # sarlavhasi) qatorga QO'SHIB bo'lamiz — aks holda sarlavha
+            # o'z matnidan ajralib, alohida xabar bo'lib ketardi.
+            pieces = _hard_split(f"{current}\n{line}" if current else line, limit)
+            current = ""
+            parts.extend(pieces[:-1])
+            # Oxirgi bo'lak to'lmagan bo'lishi mumkin — keyingi qatorlar
+            # unga qo'shilaveradi.
+            current = pieces[-1] if pieces else ""
+            continue
+        candidate = f"{current}\n{line}" if current else line
+        if tg_len(candidate) > limit:
+            flush()
             current = line
         else:
-            current = f"{current}\n{line}" if current else line
-    if current:
-        parts.append(current)
+            current = candidate
+    flush()
     return parts

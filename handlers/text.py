@@ -31,14 +31,17 @@ async def on_text(message: Message, lang: str) -> None:
     status = await message.answer(t("translating", lang))
     try:
         result = await translate_all(source_text, ui_lang=lang)
+        # Yuborish ham shu blok ichida: ilgari u tashqarida turgani uchun
+        # Telegram xatosi foydalanuvchiga bildirilmay, javob jimgina
+        # yo'qolib ketardi.
+        await deliver(message, status, render(result, lang))
     except TranslationError as exc:
         log.warning("Tarjima muvaffaqiyatsiz: %s", exc)
         await status.edit_text(t("error", lang))
         return
     except Exception:
         log.exception("Matnni tarjima qilishda kutilmagan xato")
-        await status.edit_text(t("error", lang))
+        await message.answer(t("error", lang))
         return
 
-    await deliver(message, status, render(result, lang))
     await db.bump("text")

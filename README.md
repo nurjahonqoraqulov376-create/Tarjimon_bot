@@ -257,6 +257,33 @@ Ovozli xabar aniqligi uchun:
 Model faqat ovoz kelganda yuklanadi va `WHISPER_IDLE_UNLOAD_SEC` dan keyin
 xotiradan bo'shatiladi, shuning uchun `small` doimiy RAM sarfini oshirmaydi.
 
+### Uzun matn qanday yuboriladi
+
+Telegram bitta xabarni 4096 belgi bilan cheklaydi, shuning uchun uzun matn
+yuborilganda **mijozning o'zi** uni bir necha xabarga bo'lib, ketma-ket
+jo'natadi. Bu ikki joyni buzgan edi:
+
+1. **Flood himoyasi bo'laklarni yeb qo'yardi.** `ThrottleMiddleware` interval
+   ichida kelgan xabarni jimgina tashlab yuborardi (`return None`), ya'ni
+   uzun matnning faqat birinchi bo'lagi tarjima qilinardi. Endi xabarlar
+   navbatda kutadi; faqat navbat `max_queue` dan oshsa ogohlantiriladi.
+2. **Javobni bo'lish.** `split_for_telegram` uzunlikni `len()` bilan
+   o'lchardi, Telegram esa **UTF-16 kod birliklarida** sanaydi — 🇺🇿 kabi
+   bayroq emoji Python uchun 2, Telegram uchun 4. Emojili matnda bo'lak
+   chegaradan oshib ketardi. Bundan tashqari funksiya ba'zan **bo'sh bo'lak**
+   qaytarardi (Telegram bo'sh xabarni rad etadi va butun yuborish to'xtardi)
+   va til sarlavhasini o'z matnidan ajratib yuborardi.
+
+Endi bo'lish `tg_len()` (UTF-16) bilan hisoblanadi, faqat so'z chegarasida
+kesadi — shu sababli `&amp;` kabi HTML entity hech qachon ikkiga
+bo'linmaydi — va sarlavha doim o'z matni bilan bitta xabarda qoladi.
+
+Yuborishning o'zi ham himoyalangan: `429` (flood) kelsa kutib qayta uriladi,
+HTML tahlil qilinmasa xabar oddiy matn sifatida yuboriladi, bitta bo'lak
+yiqilsa qolganlari baribir yetkaziladi. `deliver` endi handler'ning
+`try/except` bloki ichida — ilgari u tashqarida turgani uchun yuborishdagi
+xato foydalanuvchiga bildirilmay, javob jimgina yo'qolardi.
+
 ### Nega bir vaqtda 3 ta so'rov
 
 Bitta xabar 6 tilga tarjima qilinadi. Oltala so'rovni birdan yuborsak

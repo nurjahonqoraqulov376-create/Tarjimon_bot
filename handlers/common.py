@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import html
 import logging
 
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import Message
 
 from config import LANG_FLAGS, LANG_NAMES, LANGS
@@ -47,8 +48,32 @@ def render(result: TranslationResult, ui_lang: str) -> str:
     return body
 
 
+async def _send(message: Message, text: str) -> None:
+    """Bitta bo'lakni yuboradi; Telegram flood cheklovida kutib qayta uradi.
+
+    HTML tahlil qilinmasa (kutilmagan belgi tufayli) xabarni oddiy matn
+    sifatida yuboramiz — foydalanuvchi hech bo'lmasa tarjimani ko'rsin.
+    """
+    for attempt in range(3):
+        try:
+            await message.answer(text)
+            return
+        except TelegramRetryAfter as exc:
+            log.warning("Telegram flood cheklovi: %s soniya kutamiz", exc.retry_after)
+            await asyncio.sleep(exc.retry_after + 0.5)
+        except TelegramBadRequest as exc:
+            log.warning("Xabar qabul qilinmadi (%s), oddiy matn sifatida uramiz", exc)
+            await message.answer(text, parse_mode=None)
+            return
+    log.error("Bo'lakni yuborib bo'lmadi (%d belgi)", len(text))
+
+
 async def deliver(message: Message, status: Message | None, body: str) -> None:
-    """Natijani yuboradi: qisqa bo'lsa status xabarini tahrirlaydi, uzun bo'lsa bo'lib yuboradi."""
+    """Natijani yuboradi: qisqa bo'lsa status xabarini tahrirlaydi, uzun bo'lsa bo'lib yuboradi.
+
+    Bitta bo'lak yuborilmasa ham qolganlari yuboriladi — ilgari birinchi
+    xatoda butun javob yo'qolib ketardi.
+    """
     parts = split_for_telegram(body)
 
     if status is not None and len(parts) == 1:
@@ -65,4 +90,4 @@ async def deliver(message: Message, status: Message | None, body: str) -> None:
             pass
 
     for part in parts:
-        await message.answer(part)
+        await _send(message, part)

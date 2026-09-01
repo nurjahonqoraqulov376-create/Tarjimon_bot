@@ -67,13 +67,15 @@ async def on_voice(message: Message, lang: str, bot: Bot, config: Config) -> Non
 
         await status.edit_text(t("translating", lang))
         result = await translate_all(transcript, hint=detected, ui_lang=lang)
+        # Yuborish ham shu blok ichida — matn handler'idagi kabi.
+        await deliver(message, status, render(result, lang))
     except TranslationError as exc:
         log.warning("Ovoz tarjimasi muvaffaqiyatsiz: %s", exc)
         await status.edit_text(t("error", lang))
         return
     except Exception:
         log.exception("Ovozli xabarni qayta ishlashda kutilmagan xato")
-        await status.edit_text(t("error", lang))
+        await message.answer(t("error", lang))
         return
     finally:
         try:
@@ -81,5 +83,4 @@ async def on_voice(message: Message, lang: str, bot: Bot, config: Config) -> Non
         except OSError:
             pass
 
-    await deliver(message, status, render(result, lang))
     await db.bump("voice")
